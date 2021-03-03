@@ -8,7 +8,7 @@ namespace AuthApp.Controllers
     [Route("[controller]")]
     public class UsersController : ControllerBase
     {
-        private IUserService _userService;
+        private readonly IUserService _userService;
 
         public UsersController(IUserService userService)
         {
@@ -42,12 +42,14 @@ namespace AuthApp.Controllers
                 return BadRequest(new {message = "Email taken"});
             }
 
-            User user = new User();
-            user.Email = userRequest.Email;
-            user.FirstName = userRequest.FirstName;
-            user.LastName = userRequest.LastName;
-            user.Password = userRequest.Password;
-             
+            var user = new User
+            {
+                Email = userRequest.Email,
+                FirstName = userRequest.FirstName,
+                LastName = userRequest.LastName,
+                Password = userRequest.Password
+            };
+
             return Ok(_userService.Create(user));
         }
 
@@ -57,11 +59,33 @@ namespace AuthApp.Controllers
             var user = _userService.GetByEmail(forgotPasswordRequest.Email);
             if(user == null)
             {
-                return BadRequest(new {message = "Email not found"});
+                return emailNotFound();
             }
             _userService.ForgotPassword(user);
             
             return Ok(new {message = "Forgot password email sent"});
+        }
+        
+        [HttpPost("confirm-email")]
+        public IActionResult ConfirmEmail(ConfirmEmailRequest confirmEmailRequest)
+        {
+            var user = _userService.GetByEmail(confirmEmailRequest.Email);
+            if (user == null)
+            {
+                return emailNotFound();
+            }
+
+            if (!_userService.ConfirmEmail(user, confirmEmailRequest.ConfirmationToken))
+            {
+                return BadRequest(new {message = "Confirmation token not valid"});
+            }
+
+            return Ok(new {message = "email confirmed"});
+        }
+
+        private IActionResult emailNotFound()
+        {
+            return BadRequest(new {message = "Email not found"});
         }
     }
 }

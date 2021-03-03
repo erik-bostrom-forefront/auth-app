@@ -8,13 +8,18 @@ namespace AuthApp.Models
     {
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
-        public string Id {get; set;}
+        public string Id { get; set; }
 
-        public string FirstName {get; set;}
-        public string LastName {get; set;}
-        public string Email {get; set;}
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public string Email { get; set; }
+        // [JsonIgnore]
+        public string ConfirmEmailToken { get; set; }
+        public bool EmailConfirmed { get; set; }
+        [JsonIgnore]
+        public string ResetPasswordToken { get; set; }
 
         [JsonIgnore]
-        public string Password {get; set;}
+        public string Password { get; set; }
     }
 }

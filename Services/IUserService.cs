@@ -12,5 +12,6 @@ namespace AuthApp.Services
         User GetByEmail(string id);
         User Create(User user);
         void ForgotPassword(User user);
+        bool ConfirmEmail(User user, string token);
     }
 }

@@ -15,6 +15,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using MongoDB.Bson;
 
 namespace AuthApp.Services
 {
@@ -52,20 +53,15 @@ namespace AuthApp.Services
             return _users.Find(u => true).ToList();
         }
 
-        public User GetById(string id)
-        {
-            // return _users.FirstOrDefault(x => string.Compare(x.Id, id, true) == 0);
-            return _users.Find<User>(u => u.Id == id).FirstOrDefault();
-        }
+        public User GetById(string id) => _users.Find<User>(u => u.Id == id).FirstOrDefault();
 
-        public User GetByEmail(string email)
-        {
-            return _users.Find<User>(u => u.Email == email).FirstOrDefault();
-        }
+        public User GetByEmail(string email) => _users.Find<User>(u => u.Email == email).FirstOrDefault();
 
         public User Create(User user)
         {
             user.Password = BC.HashPassword(user.Password);
+            user.ConfirmEmailToken = createConfirmationToken();
+            user.EmailConfirmed = false;
             _users.InsertOne(user);
             return user;
         }
@@ -73,6 +69,15 @@ namespace AuthApp.Services
         public async void ForgotPassword(User user)
         {
             await sendForgotPasswordEmail(user);
+        }
+
+        public bool ConfirmEmail(User user, string token)
+        {
+            if (user.ConfirmEmailToken != token || !validateConfirmationToken(token)) return false;
+            var filter = Builders<User>.Filter.Eq("Email", user.Email);
+            var update = Builders<User>.Update.Set("EmailConfirmed", true);
+            _users.UpdateOne(filter, update);
+            return true;
         }
 
         private string generateJwtToken(User user)
@@ -94,12 +99,29 @@ namespace AuthApp.Services
             var apiKey = _appSettings.SendgridApiKey;
             var client = new SendGridClient(apiKey);
             var from = new EmailAddress("erik.bostrom@forefront.se", "Erik Boström");
-            var subject = "Forgot password";
+            const string subject = "Forgot password";
             var to = new EmailAddress(user.Email, user.FirstName + " " + user.LastName);
-            var plainTextContent = "You have forgotten your email";
-            var htmlContent = "<strong>remember your password</strong>";
+            const string plainTextContent = "You have forgotten your email";
+            const string htmlContent = "<strong>remember your password</strong>";
             var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
             var response = await client.SendEmailAsync(msg);
+        }
+
+        private string createConfirmationToken()
+        {
+            var time = BitConverter.GetBytes(DateTime.UtcNow.ToBinary());
+            var key = Guid.NewGuid().ToByteArray();
+            var token = Convert.ToBase64String(time.Concat(key).ToArray());
+
+            return token;
+        }
+
+        private bool validateConfirmationToken(string token)
+        {
+            var data = Convert.FromBase64String(token);
+            var when = DateTime.FromBinary(BitConverter.ToInt64(data, 0));
+            
+            return when >= DateTime.UtcNow.AddHours(-24);
         }
     }
 }
